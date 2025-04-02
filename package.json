@@ -1,21 +1,14 @@
 {
-  "name": "margonem-guild-tracker",
+  "name": "guild-stats",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Aplikacja śledząca statystyki gildii w grze Margonem",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
-  },
+  "description": "Margonem Guild Statistics - The Wall",
+  "main": "src/scraper.js",
   "author": "Etheriiss",
-  "license": "ISC",
-  "dependencies": {
-    "express": "^5.1.0",
-    "jsdom": "^26.0.0",
-    "node-cron": "^3.0.3"
+  "type": "module",
+  "scripts": {
+    "start": "node src/scraper.js"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.9"
+  "dependencies": {
+    "jsdom": "^22.1.0"
   }
 }

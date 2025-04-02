@@ -1,44 +1,12 @@
-// index.js - główny plik aplikacji
+// scraper.js - Skrypt do uruchamiania przez GitHub Actions
 import { JSDOM } from 'jsdom';
-import cron from 'node-cron';
 import fs from 'fs/promises';
-import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
-const PORT = process.env.PORT || 3000;
 const GUILD_URL = 'https://www.margonem.pl/guilds/view,nyras,47';
-const DATA_PATH = path.join(__dirname, 'public', 'data.json');
-
-// Obsługa plików statycznych
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Główna trasa
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// API endpoint do pobierania danych
-app.get('/api/guild-data', async (req, res) => {
-  try {
-    const data = await fs.readFile(DATA_PATH, 'utf8');
-    res.json(JSON.parse(data));
-  } catch (error) {
-    res.status(500).json({ error: 'Nie udało się załadować danych' });
-  }
-});
-
-// Endpoint dla cron job
-app.get('/api/cron', async (req, res) => {
-  try {
-    await scrapeGuildPage();
-    res.status(200).send('Aktualizacja wykonana pomyślnie');
-  } catch (error) {
-    res.status(500).send('Błąd podczas aktualizacji danych');
-  }
-});
+const DATA_PATH = path.join(__dirname, '..', 'public', 'data.json');
 
 // Funkcja do parsowania strony gildii
 async function scrapeGuildPage() {
@@ -130,6 +98,13 @@ async function scrapeGuildPage() {
       highLevelCount
     };
     
+    // Upewnij się, że folder public istnieje
+    try {
+      await fs.access(path.join(__dirname, '..', 'public'));
+    } catch {
+      await fs.mkdir(path.join(__dirname, '..', 'public'), { recursive: true });
+    }
+    
     // Zapisz dane do pliku
     await fs.writeFile(DATA_PATH, JSON.stringify(guildData, null, 2));
     
@@ -209,40 +184,12 @@ function generateEnhancedRecommendations(professionStats, highLevelProfessionSta
   return recommendations;
 }
 
-async function logCronExecution() {
-    const logPath = path.join(__dirname, 'public', 'cron-log.txt');
-    const timestamp = new Date().toLocaleString('pl-PL');
-    await fs.appendFile(logPath, `Cron executed at: ${timestamp}\n`);
-}
-
-// Uruchom początkową aktualizację danych
+// Uruchom scraper
 (async () => {
   try {
-    // Sprawdź, czy folder public istnieje
-    try {
-      await fs.access(path.join(__dirname, 'public'));
-    } catch {
-      await fs.mkdir(path.join(__dirname, 'public'));
-    }
-    
-    // Pobierz dane po raz pierwszy
     await scrapeGuildPage();
-    
-    // Uruchom serwer
-    app.listen(PORT, () => {
-      console.log(`Serwer uruchomiony na porcie ${PORT}`);
-    });
-    
-    // Zaplanuj codzienną aktualizację o 6:00 rano
-    cron.schedule('0 6 * * *', async () => {
-      try {
-        await scrapeGuildPage();
-        console.log('Zaplanowana aktualizacja wykonana o 6:00');
-      } catch (error) {
-        console.error('Błąd podczas zaplanowanej aktualizacji:', error);
-      }
-    });
   } catch (error) {
-    console.error('Błąd podczas inicjalizacji aplikacji:', error);
+    console.error('Błąd podczas uruchamiania scrapera:', error);
+    process.exit(1);
   }
 })();
