@@ -9,6 +9,7 @@
     "start": "node src/scraper.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "jsdom": "^22.1.0",
     "node-fetch": "^3.3.2"
   }

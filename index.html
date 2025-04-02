@@ -170,19 +170,8 @@
 
     async function loadGuildData() {
       try {
-        // Bezpośrednio pobieramy plik data.json, który jest generowany przez GitHub Actions
-        const response = await fetch('./data.json');
+        const response = await fetch('/api/guild-data');
         guildData = await response.json();
-        
-        // Pobierz informację o ostatnim uruchomieniu scrapera
-        try {
-          const lastRunResponse = await fetch('./lastRun.json');
-          const lastRunData = await lastRunResponse.json();
-          document.getElementById('lastRunTime').textContent = lastRunData.lastRun;
-        } catch (err) {
-          document.getElementById('lastRunTime').textContent = 'Nieznany';
-          console.error('Nie udało się pobrać informacji o ostatnim uruchomieniu:', err);
-        }
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
