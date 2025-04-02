@@ -1,0 +1,345 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Statystyki Gildii Margonem</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f5f5f5;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .card {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      border-radius: 10px;
+      border: none;
+    }
+    .card-header {
+      background-color: #4a235a;
+      color: white;
+      border-radius: 10px 10px 0 0 !important;
+      font-weight: bold;
+    }
+    .table-responsive {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .alert-recommendation {
+      background-color: #f8f9fa;
+      border-left: 4px solid #4a235a;
+      margin-bottom: 10px;
+      padding: 10px 15px;
+    }
+    .profession-chart {
+      max-height: 400px;
+    }
+    .last-updated {
+      font-size: 0.8rem;
+      font-style: italic;
+      color: #6c757d;
+    }
+    .spinner-container {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .bg-highlight {
+      background-color: #f8d7da;
+    }
+    .level-filter {
+      margin-bottom: 20px;
+    }
+    .level-badge {
+      background-color: #4a235a;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 15px;
+      margin-left: 10px;
+    }
+    .recommendation-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4 mb-4">
+    <div id="loading" class="spinner-container">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Ładowanie...</span>
+      </div>
+    </div>
+    
+    <div id="content" class="row" style="display: none;">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="mb-0">Statystyki Gildii Nyras</h2>
+          </div>
+          <div class="card-body">
+            <p class="last-updated">Ostatnia aktualizacja: <span id="lastUpdated"></span></p>
+            
+            <div class="level-filter">
+              <div class="btn-group" role="group">
+                <button type="button" class="btn btn-primary active" data-filter="all">Wszyscy gracze <span id="allMembersCount" class="level-badge">0</span></button>
+                <button type="button" class="btn btn-outline-primary" data-filter="high">Gracze 300+ <span id="highLevelCount" class="level-badge">0</span></button>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-header">Rozkład profesji</div>
+                  <div class="card-body">
+                    <canvas id="professionChart" class="profession-chart"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card">
+                  <div class="card-header">Statystyki profesji</div>
+                  <div class="card-body">
+                    <div class="table-responsive">
+                      <table class="table table-striped table-hover">
+                        <thead>
+                          <tr>
+                            <th>Profesja</th>
+                            <th>Liczba</th>
+                            <th>Procent</th>
+                          </tr>
+                        </thead>
+                        <tbody id="professionStatsBody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="card mt-4">
+              <div class="card-header">Rekomendacje</div>
+              <div class="card-body">
+                <p class="recommendation-title">Na podstawie analizy składu gildii, zalecamy:</p>
+                <div id="recommendationsContainer"></div>
+              </div>
+            </div>
+            
+            <div class="card mt-4">
+              <div class="card-header">Lista członków gildii (<span id="memberCount">0</span>)</div>
+              <div class="card-body">
+                <div class="input-group mb-3">
+                  <input type="text" id="memberSearch" class="form-control" placeholder="Szukaj członka...">
+                  <button class="btn btn-outline-secondary" type="button" id="clearSearch">Wyczyść</button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover">
+                    <thead>
+                      <tr>
+                        <th>Nick</th>
+                        <th>Poziom</th>
+                        <th>Profesja</th>
+                      </tr>
+                    </thead>
+                    <tbody id="membersTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Kolory dla wykresu
+    const colorPalette = [
+      '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+      '#8950FC', '#2c9faf', '#9581FF', '#f39c12', '#e83e8c',
+      '#fd7e14', '#6f42c1', '#20c9a6', '#5a5c69', '#7400b8'
+    ];
+
+    let guildData = null;
+    let professionChart = null;
+    let currentFilter = 'all';
+
+    async function loadGuildData() {
+      try {
+        const response = await fetch('/api/guild-data');
+        guildData = await response.json();
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        
+        displayGuildData(guildData);
+        setupEventListeners();
+      } catch (error) {
+        console.error('Błąd podczas ładowania danych:', error);
+        document.getElementById('loading').innerHTML = '<div class="alert alert-danger">Błąd podczas ładowania danych. Odśwież stronę.</div>';
+      }
+    }
+
+    function setupEventListeners() {
+      // Filtry poziomu
+      document.querySelectorAll('.level-filter .btn').forEach(button => {
+        button.addEventListener('click', function() {
+          document.querySelectorAll('.level-filter .btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-primary');
+          });
+          
+          this.classList.add('active');
+          this.classList.add('btn-primary');
+          this.classList.remove('btn-outline-primary');
+          
+          currentFilter = this.getAttribute('data-filter');
+          updateChartAndStats();
+        });
+      });
+      
+      // Wyszukiwanie członków
+      document.getElementById('memberSearch').addEventListener('input', filterMembers);
+      document.getElementById('clearSearch').addEventListener('click', clearSearch);
+    }
+
+    function updateChartAndStats() {
+      // Wybierz odpowiednie dane w zależności od filtru
+      const statsToUse = currentFilter === 'high' ? guildData.highLevelProfessionStats : guildData.professionStats;
+      
+      // Aktualizuj wykres
+      updateProfessionChart(statsToUse);
+      
+      // Aktualizuj tabelę statystyk
+      const professionStatsBody = document.getElementById('professionStatsBody');
+      professionStatsBody.innerHTML = '';
+      
+      statsToUse.forEach(stat => {
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+          <td>${stat.profession}</td>
+          <td>${stat.count}</td>
+          <td>${stat.percentage}%</td>
+        `;
+        
+        professionStatsBody.appendChild(row);
+      });
+    }
+
+    function updateProfessionChart(statsData) {
+      const ctx = document.getElementById('professionChart').getContext('2d');
+      
+      const labels = statsData.map(stat => stat.profession);
+      const data = statsData.map(stat => stat.count);
+      const backgroundColors = statsData.map((_, index) => colorPalette[index % colorPalette.length]);
+      
+      if (professionChart) {
+        professionChart.destroy();
+      }
+      
+      professionChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: backgroundColors,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right'
+            }
+          }
+        }
+      });
+    }
+
+    function displayGuildData(data) {
+      // Ustaw ostatnią aktualizację
+      document.getElementById('lastUpdated').textContent = data.lastUpdated;
+      
+      // Ustaw liczby członków
+      document.getElementById('memberCount').textContent = data.totalMembers;
+      document.getElementById('allMembersCount').textContent = data.totalMembers;
+      document.getElementById('highLevelCount').textContent = data.highLevelCount;
+      
+      // Wypełnij tabelę członków
+      const membersTableBody = document.getElementById('membersTableBody');
+      membersTableBody.innerHTML = '';
+      
+      data.members.forEach(member => {
+        const row = document.createElement('tr');
+        
+        // Wyróżnij graczy z poziomem powyżej 300
+        if (member.level > 300) {
+          row.classList.add('bg-highlight');
+        }
+        
+        row.innerHTML = `
+          <td>${member.nick}</td>
+          <td>${member.level}</td>
+          <td>${member.profession}</td>
+        `;
+        
+        membersTableBody.appendChild(row);
+      });
+      
+      // Wyświetl rekomendacje
+      const recommendationsContainer = document.getElementById('recommendationsContainer');
+      recommendationsContainer.innerHTML = '';
+      
+      if (data.recommendations.length > 0) {
+        data.recommendations.forEach(recommendation => {
+          const alertDiv = document.createElement('div');
+          alertDiv.className = 'alert alert-recommendation';
+          alertDiv.textContent = recommendation;
+          
+          recommendationsContainer.appendChild(alertDiv);
+        });
+      } else {
+        recommendationsContainer.innerHTML = '<p>Nie ma szczególnych rekomendacji. Rozkład profesji jest zrównoważony.</p>';
+      }
+      
+      // Wygeneruj wykres (domyślnie dla wszystkich graczy)
+      updateChartAndStats();
+    }
+
+    function filterMembers() {
+      const searchValue = document.getElementById('memberSearch').value.toLowerCase();
+      const rows = document.querySelectorAll('#membersTableBody tr');
+      
+      rows.forEach(row => {
+        const nick = row.cells[0].textContent.toLowerCase();
+        const profession = row.cells[2].textContent.toLowerCase();
+        
+        if (nick.includes(searchValue) || profession.includes(searchValue)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    function clearSearch() {
+      document.getElementById('memberSearch').value = '';
+      document.querySelectorAll('#membersTableBody tr').forEach(row => {
+        row.style.display = '';
+      });
+    }
+
+    // Załaduj dane przy ładowaniu strony
+    window.addEventListener('DOMContentLoaded', loadGuildData);
+  </script>
+</body>
+</html>
