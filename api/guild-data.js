@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  'https://akbiubtqvjhpjhgnmnss.supabase.co',
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_API_KEY
 );
 
 export default async function handler(req, res) {

@@ -1,11 +1,9 @@
-// /api/scrape.js
 import { JSDOM } from 'jsdom';
-import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_API_KEY
 );
 
 export default async function handler(req, res) {
@@ -18,7 +16,7 @@ export default async function handler(req, res) {
       .upsert([{
         id: 'current',
         json: guildData,
-        updated: new Date().toISOString()
+        updated_at: new Date().toISOString()
       }]);
 
     if (error) throw error;
